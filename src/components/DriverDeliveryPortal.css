@@ -1,0 +1,512 @@
+/* ==========================================================================
+   DELIVERY TERMINAL & GPS TACTICAL MAP STYLING
+   ========================================================================== */
+
+.delivery-portal-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+/* 1. Telemetry Status Bar */
+.driver-telemetry-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--card-shadow);
+}
+
+@media (max-width: 768px) {
+  .driver-telemetry-bar {
+    grid-template-columns: 1fr;
+  }
+}
+
+.telemetry-item {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.telemetry-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.telemetry-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted, #64748b);
+}
+
+.telemetry-value {
+  font-size: 0.88rem;
+  color: var(--text-primary, #0f172a);
+}
+
+/* 2. Active 2-Column Mission Layout */
+.active-mission-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .active-mission-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mission-map-panel,
+.mission-controls-panel,
+.available-pool-panel {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+  border-radius: var(--radius-lg, 16px);
+  padding: 1.5rem;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.map-badge-live {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 9999px;
+}
+
+/* 3. Realtime GPS Vector Simulation Canvas */
+.gps-map-canvas {
+  position: relative;
+  height: 280px;
+  background: radial-gradient(circle at center, #1e293b 0%, #0b1120 100%);
+  border-radius: 12px;
+  border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.12));
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 3.5rem;
+}
+
+.map-grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.map-waypoint {
+  position: relative;
+  z-index: 10;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 2px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donor-node { border-color: #10b981; }
+.ngo-node { border-color: #8b5cf6; }
+
+.waypoint-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.waypoint-pulse.green { background: rgba(16, 185, 129, 0.25); }
+.waypoint-pulse.purple { background: rgba(139, 92, 246, 0.25); }
+
+@keyframes ping {
+  75%, 100% { transform: scale(1.6); opacity: 0; }
+}
+
+.waypoint-tooltip {
+  position: absolute;
+  bottom: -28px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.route-vector-line {
+  position: absolute;
+  left: 5rem;
+  right: 5rem;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  z-index: 5;
+}
+
+.route-vector-progress {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #3b82f6);
+  border-radius: 4px;
+  transition: width 1s ease-in-out;
+}
+
+.driver-courier-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.8);
+  z-index: 15;
+  transition: left 1s ease-in-out;
+}
+
+.route-instructions-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.25rem;
+  background: var(--bg-input, #f8fafc);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.instruction-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.instruction-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.instruction-sub {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* 4. Pipeline Step Actions */
+.cargo-brief-card {
+  background: var(--bg-input, #f8fafc);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.cargo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.cargo-details {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pipeline-steps-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.pipeline-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-elevated, #f1f5f9);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.pipeline-action-btn.current {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.pipeline-action-btn.done {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.pipeline-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 5. Verification PIN Module */
+.verification-form-box {
+  background: var(--bg-input, #f8fafc);
+  border: 1px dashed var(--brand-emerald);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.verification-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.pin-input-wrap {
+  display: flex;
+  gap: 0.65rem;
+}
+
+.pin-input-wrap input {
+  width: 140px;
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-size: 1.1rem;
+  font-weight: 800;
+  padding: 0.55rem;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.btn-complete-delivery {
+  flex: 1;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.btn-complete-delivery:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 6. Available Missions Grid */
+.available-pickup-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.pickup-mission-card {
+  background: var(--bg-input, #f8fafc);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mission-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mission-item-title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.mission-meta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-claim-mission {
+  margin-top: 0.5rem;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 0.65rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-claim-mission:hover {
+  background: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.empty-runs-card {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+}
+/* Auth Screen */
+.driver-auth-card {
+  max-width: 440px;
+  margin: 40px auto;
+  padding: 32px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+}
+
+.driver-auth-icon {
+  width: 48px;
+  height: 48px;
+  background: #ecfdf5;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.input-group {
+  margin-bottom: 16px;
+}
+
+.input-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.input-wrap input {
+  border: none;
+  outline: none;
+  width: 100%;
+  font-size: 14px;
+}
+
+.btn-auth-submit {
+  width: 100%;
+  background: #059669;
+  color: white;
+  padding: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+/* Driver Stats Grid */
+.driver-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.driver-stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.highlight-earnings {
+  border-left: 4px solid #10b981;
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 4px 0;
+}
+
+.earning-cell {
+  color: #059669;
+  font-weight: 700;
+}
+
+.driver-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.driver-table th, .driver-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}

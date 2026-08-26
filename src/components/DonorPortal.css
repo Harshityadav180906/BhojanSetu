@@ -1,0 +1,211 @@
+/* ==========================================================================
+   DONOR PORTAL STYLING & INPUT GRIDS
+   ========================================================================== */
+
+.donor-workspace {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 1.75rem;
+}
+
+@media (max-width: 1024px) {
+  .donor-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.donor-form-card,
+.donor-feed-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.form-top-header,
+.feed-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.form-header-title,
+.feed-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.org-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--brand-emerald);
+  background: rgba(16, 185, 129, 0.12);
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.form-author-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+}
+
+.donor-actual-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-split-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-input-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.form-input-block label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.form-input-block input,
+.form-input-block select {
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.form-input-block input:focus,
+.form-input-block select:focus {
+  border-color: var(--brand-emerald);
+}
+
+.submit-donation-btn {
+  margin-top: 0.5rem;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 0.85rem;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px var(--brand-emerald-glow);
+  transition: var(--transition-smooth);
+}
+
+.submit-donation-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--brand-emerald-glow);
+}
+
+.feed-tab-group {
+  display: flex;
+  background: var(--bg-input);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.feed-tab {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.feed-tab.active {
+  background: var(--bg-surface);
+  color: var(--brand-emerald);
+}
+
+.feed-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 1rem;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.feed-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: var(--transition-smooth);
+}
+
+.feed-card:hover {
+  border-color: var(--border-strong);
+  transform: translateX(3px);
+}
+
+.feed-top,
+.feed-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.feed-item-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.feed-source,
+.feed-location {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cat-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--brand-emerald);
+}
+
+.status-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-emerald);
+} 
