@@ -60,15 +60,15 @@ export default function DonorPortal({ user }) {
   });
 
   return (
-    <div className="donor-workspace fade-in">
+    <div className="donor-workspace">
       {/* Food Surplus Report Form */}
       <div className="donor-form-card">
         <div className="form-top-header">
           <h3 className="form-header-title">
-            <PlusCircle className="plus-icon w-5 h-5 text-emerald-600" /> Report Surplus Food
+            <PlusCircle className="plus-icon text-emerald-600" /> Report Surplus Food
           </h3>
           <span className="org-badge">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" /> Verified Partner
+            <ShieldCheck className="shield-icon text-emerald-500" /> Verified Partner
           </span>
         </div>
         <p className="form-author-note">
@@ -152,11 +152,11 @@ export default function DonorPortal({ user }) {
           <button type="submit" disabled={isSubmitting} className="submit-donation-btn">
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Broadcasting...
+                <Loader2 className="btn-icon animate-spin" /> Broadcasting...
               </>
             ) : (
               <>
-                <PackageCheck className="w-4 h-4" /> Broadcast to Rescuers
+                <PackageCheck className="btn-icon" /> Broadcast to Rescuers
               </>
             )}
           </button>
@@ -185,10 +185,10 @@ export default function DonorPortal({ user }) {
 
         <div className="feed-cards-grid">
           {loading ? (
-            <p className="text-gray-400 p-4">Loading real-time donations from Supabase...</p>
+            <p className="status-message">Loading real-time donations from Supabase...</p>
           ) : displayedDonations.length === 0 ? (
             <div className="empty-feed-placeholder">
-              <AlertCircle className="w-6 h-6 text-gray-400" />
+              <AlertCircle className="placeholder-icon" />
               <p>No listings found.</p>
             </div>
           ) : (
@@ -199,18 +199,18 @@ export default function DonorPortal({ user }) {
                     {item.type}
                   </span>
                   <span className="feed-time">
-                    <Clock className="w-3.5 h-3.5" /> {item.expiry}
+                    <Clock className="card-inline-icon" /> {item.expiry}
                   </span>
                 </div>
                 <h4 className="feed-item-title">{item.item}</h4>
                 <p className="feed-source">Donor: <strong>{item.donor}</strong></p>
                 <p className="feed-location">
-                  <MapPin className="w-3.5 h-3.5 text-gray-500" /> {item.location}
+                  <MapPin className="card-inline-icon" /> {item.location}
                 </p>
                 <div className="feed-bottom">
                   <span className="feed-qty">{item.quantity}</span>
                   <span className={`status-tag ${item.status?.toLowerCase().replace(/\s+/g, '-')}`}>
-                    <CheckCircle2 className="w-3.5 h-3.5" /> {item.status}
+                    <CheckCircle2 className="card-inline-icon" /> {item.status}
                   </span>
                 </div>
               </div>
