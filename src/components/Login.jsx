@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Heart, Lock, Mail, AlertCircle, KeyRound, Loader2, UserPlus } from 'lucide-react';
+import { Heart, Lock, Mail, AlertCircle, KeyRound, Loader2 } from 'lucide-react';
 import './Login.css';
 
 const PRESET_USERS = [
@@ -39,7 +39,6 @@ export default function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
 
-  // New Registration fields
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('donor');
   const [organization, setOrganization] = useState('');
@@ -48,7 +47,6 @@ export default function Login({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // 1. Authenticate user against Supabase
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -57,7 +55,7 @@ export default function Login({ onLoginSuccess }) {
 
     try {
       if (isRegisterMode) {
-        // Sign Up Flow - Saves into auth.users and triggers public.profiles insert
+        // Sign Up Flow
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
           password: password,
@@ -72,8 +70,36 @@ export default function Login({ onLoginSuccess }) {
 
         if (signUpError) throw signUpError;
 
-        setSuccessMsg('Account registered in Supabase! You can now sign in.');
-        setIsRegisterMode(false);
+        // Ensure row exists in profiles table
+        if (data?.user) {
+          await supabase.from('profiles').upsert({
+            id: data.user.id,
+            email: data.user.email,
+            full_name: fullName,
+            role: role,
+            organization: organization
+          });
+        }
+
+        setSuccessMsg('Account registered successfully! Signing in...');
+        
+        // Auto-login newly registered user
+        const { data: signInData } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: password
+        });
+
+        if (signInData?.user) {
+          onLoginSuccess({
+            id: signInData.user.id,
+            email: signInData.user.email,
+            name: fullName,
+            role: role.toUpperCase(),
+            organization: organization
+          });
+        } else {
+          setIsRegisterMode(false);
+        }
       } else {
         // Sign In Flow
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
@@ -83,54 +109,41 @@ export default function Login({ onLoginSuccess }) {
 
         if (signInError) throw signInError;
 
-        // Fetch saved profile details from Supabase database
-        const { data: profile, error: profileError } = await supabase
+        // Fetch profile
+        const { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
-          .single();
+          .maybeSingle();
 
-        if (profileError || !profile) {
-          // Fallback if profile row is fetching
-          onLoginSuccess({
-            id: data.user.id,
-            email: data.user.email,
-            name: data.user.user_metadata?.full_name || 'BhojanSetu User',
-            role: data.user.user_metadata?.role || 'donor',
-            organization: data.user.user_metadata?.organization || 'Partner Center'
-          });
-        } else {
-          onLoginSuccess({
-            id: profile.id,
-            email: profile.email,
-            name: profile.full_name,
-            role: profile.role,
-            organization: profile.organization
-          });
-        }
+        onLoginSuccess({
+          id: data.user.id,
+          email: data.user.email,
+          name: profile?.full_name || data.user.user_metadata?.full_name || 'BhojanSetu Member',
+          role: (profile?.role || data.user.user_metadata?.role || 'admin').toUpperCase(),
+          organization: profile?.organization || data.user.user_metadata?.organization || 'Central Ops'
+        });
       }
     } catch (err) {
-      setError(err.message || 'Authentication failed.');
+      setError(err.message || 'Authentication error.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper: Seeds preset users into Supabase if clicking quick pill
   const handlePresetSelect = async (preset) => {
     setEmail(preset.email);
     setPassword(preset.password);
     setError('');
-
-    // Attempt sign in; if user doesn't exist, automatically register in Supabase
     setLoading(true);
+
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email: preset.email,
       password: preset.password
     });
 
-    if (signInError && signInError.message.includes('Invalid login credentials')) {
-      // Auto-register to Supabase
+    if (signInError) {
+      // Auto register if account does not exist
       const { data: signUpData, error: regError } = await supabase.auth.signUp({
         email: preset.email,
         password: preset.password,
@@ -143,29 +156,37 @@ export default function Login({ onLoginSuccess }) {
         }
       });
 
-      if (!regError && signUpData.user) {
+      if (!regError && signUpData?.user) {
+        await supabase.from('profiles').upsert({
+          id: signUpData.user.id,
+          email: preset.email,
+          full_name: preset.name,
+          role: preset.role,
+          organization: preset.organization
+        });
+
         onLoginSuccess({
           id: signUpData.user.id,
           email: preset.email,
           name: preset.name,
-          role: preset.role,
+          role: preset.role.toUpperCase(),
           organization: preset.organization
         });
       } else {
-        setError(regError?.message || 'Error initializing user in Supabase.');
+        setError(regError?.message || signInError.message);
       }
     } else if (data?.user) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', data.user.id)
-        .single();
+        .maybeSingle();
 
       onLoginSuccess({
         id: data.user.id,
         email: preset.email,
         name: profile?.full_name || preset.name,
-        role: profile?.role || preset.role,
+        role: (profile?.role || preset.role).toUpperCase(),
         organization: profile?.organization || preset.organization
       });
     }

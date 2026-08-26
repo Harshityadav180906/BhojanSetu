@@ -4,7 +4,6 @@ import {
   Truck, 
   Building2, 
   ChevronLeft, 
-  ChevronRight, 
   Bell, 
   ShieldCheck, 
   LogOut, 
@@ -88,7 +87,7 @@ export default function Sidebar({
 
   const handleNavClick = (id) => {
     onSelectTab?.(id);
-    setMobileOpen(false); // Auto close mobile drawer on selection
+    setMobileOpen(false);
   };
 
   return (
@@ -120,8 +119,13 @@ export default function Sidebar({
       <aside className={`bhojan-sidebar ${isCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
         {/* Brand Header */}
         <div className="sidebar-header">
-          <div className="brand-wrap" onClick={() => isCollapsed && setIsCollapsed(false)}>
-            <div className={`brand-logo-icon ${currentRoleConfig.badgeColor}`} title={isCollapsed ? 'Click to expand' : undefined}>
+          {/* Clicking the sparkle logo expands the sidebar when collapsed */}
+          <div 
+            className="brand-wrap" 
+            onClick={() => isCollapsed && setIsCollapsed(false)}
+            title={isCollapsed ? 'Click to expand full sidebar' : undefined}
+          >
+            <div className={`brand-logo-icon ${currentRoleConfig.badgeColor}`}>
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             {!isCollapsed && (
@@ -134,15 +138,17 @@ export default function Sidebar({
             )}
           </div>
 
-          {/* Desktop Expand / Collapse Button */}
-          <button 
-            className="collapse-btn desktop-only"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            aria-label="Toggle Navigation Width"
-          >
-            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
+          {/* Arrow Collapse Button (Only shown when expanded) */}
+          {!isCollapsed && (
+            <button 
+              className="collapse-btn desktop-only"
+              onClick={() => setIsCollapsed(true)}
+              title="Collapse Sidebar"
+              aria-label="Collapse Navigation"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Navigation Body */}
@@ -158,7 +164,7 @@ export default function Sidebar({
               </div>
             )}
 
-            {expandedSection && (
+            {(expandedSection || isCollapsed) && (
               <nav className="nav-list">
                 {currentRoleConfig.navItems.map((item) => {
                   const Icon = item.icon;
@@ -169,7 +175,6 @@ export default function Sidebar({
                       key={item.id}
                       className={`nav-item ${isActive ? 'active' : ''}`}
                       onClick={() => handleNavClick(item.id)}
-                      title={isCollapsed ? item.label : undefined}
                     >
                       <div className="nav-icon-wrapper">
                         <Icon className="nav-icon w-5 h-5" />
@@ -200,7 +205,7 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Context Status Widget */}
+        {/* Dynamic Context Widget */}
         {!isCollapsed && (
           <div className="sidebar-status-card">
             <div className="status-card-header">
