@@ -1,5 +1,5 @@
 /* ==========================================================================
-   THEME VARIABLES & GLOBAL APP SHELL
+   THEME VARIABLES & GLOBAL SHELL
    ========================================================================== */
 
 :root {
@@ -51,26 +51,38 @@
   margin: 0;
   padding: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }
 
-body {
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  overflow-x: hidden;
 }
 
 .app-layout {
   display: flex;
+  width: 100%;
   min-height: 100vh;
+  background-color: var(--bg-primary);
   position: relative;
 }
 
 .app-main-content {
   flex: 1;
-  padding: 2rem;
+  width: 100%;
+  min-width: 0;
+  padding: 1.75rem 2.25rem;
   overflow-y: auto;
   max-height: 100vh;
+  background-color: var(--bg-primary);
+  box-sizing: border-box;
 }
 
 /* Animations */
@@ -101,7 +113,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
   padding: 1rem;
 }
 
@@ -180,6 +192,7 @@ body {
   background: var(--bg-input);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
+  gap: 1rem;
 }
 
 .setting-toggle-row h4 {
@@ -204,6 +217,7 @@ body {
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .settings-footer {
@@ -243,50 +257,16 @@ body {
   font-size: 0.85rem;
   cursor: pointer;
 }
-/* ==========================================================================
-   FULLSCREEN ROOT OVERRIDES (Fixes Edge-to-Edge Constraints)
-   ========================================================================== */
-
-html,
-body,
-#root {
-  width: 100vw;
-  min-width: 100vw;
-  height: 100vh;
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-  max-width: 100vw !important;
-  overflow-x: hidden;
-  box-sizing: border-box;
-}
-
-.app-layout {
-  display: flex;
-  width: 100vw;
-  height: 100vh;
-  min-height: 100vh;
-  background-color: var(--bg-primary);
-  overflow: hidden;
-}
-
-.app-main-content {
-  flex: 1 1 auto;
-  width: 100%;
-  height: 100vh;
-  padding: 1.75rem 2.25rem;
-  overflow-y: auto;
-  background-color: var(--bg-primary);
-}
 
 /* Logged Out Fullscreen State */
 .logged-out-screen {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--bg-primary);
+  padding: 1rem;
 }
 
 .logged-out-card {
@@ -296,7 +276,7 @@ body,
   padding: 2.5rem;
   text-align: center;
   max-width: 420px;
-  width: 90%;
+  width: 100%;
   box-shadow: var(--card-shadow);
 }
 
@@ -309,4 +289,36 @@ body,
 .logged-out-card p {
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  .app-layout {
+    flex-direction: column;
+  }
+
+  .app-main-content {
+    padding: 1.25rem 1rem;
+    max-height: unset;
+    height: auto;
+  }
+}
+
+@media (max-width: 540px) {
+  .settings-form {
+    padding: 1rem;
+  }
+
+  .settings-modal {
+    margin: 0.5rem;
+  }
+
+  .setting-toggle-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
 }
