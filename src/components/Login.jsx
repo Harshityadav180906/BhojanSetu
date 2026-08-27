@@ -25,6 +25,15 @@ const PRESET_USERS = [
     photo_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150'
   },
   {
+    email: 'driver@bhojansetu.org',
+    password: 'Password@123',
+    name: 'Marcus Vance',
+    role: 'DRIVER',
+    organization: 'Express Fleet 04',
+    photo_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    vehicle_number: 'DL 03 AX 1234'
+  },
+  {
     email: 'ngo@bhojansetu.org',
     password: 'Password@123',
     name: 'Sister Sarah Jenkins',
@@ -122,7 +131,7 @@ export default function Login({ onLoginSuccess }) {
 
     // Mandatory Photo Validation for Drivers
     if (isRegisterMode && isDriver && !photoUrl) {
-      setError('Driver Verification Photo is compulsory. Please take a photo or upload an image.');
+      setError('Driver verification photo is compulsory. Please take a photo or upload an image.');
       setLoading(false);
       return;
     }
@@ -132,12 +141,14 @@ export default function Login({ onLoginSuccess }) {
 
     try {
       if (isRegisterMode) {
+        // 1. Auth Sign Up
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
           password: password,
           options: {
             data: {
               full_name: fullName,
+              name: fullName,
               phone: phone,
               role: normalizedRole,
               organization: organization || 'BhojanSetu Network',
@@ -152,8 +163,9 @@ export default function Login({ onLoginSuccess }) {
 
         if (signUpError) throw signUpError;
 
+        // 2. Direct Fallback Upsert into Profiles Table
         if (data?.user) {
-          await supabase.from('profiles').upsert({
+          const profilePayload = {
             id: data.user.id,
             email: data.user.email,
             full_name: fullName,
@@ -165,8 +177,27 @@ export default function Login({ onLoginSuccess }) {
             latitude: latitude,
             longitude: longitude,
             photo_url: defaultPhoto
-          });
+          };
 
+          await supabase.from('profiles').upsert(profilePayload);
+
+          // If Driver, explicitly save to drivers table
+          if (normalizedRole === 'DRIVER') {
+            await supabase.from('drivers').upsert({
+              id: data.user.id,
+              name: fullName,
+              email: data.user.email,
+              phone: phone,
+              vehicle: vehicleNumber || 'Express Fleet EV',
+              address: address,
+              photo_url: defaultPhoto,
+              status: 'Standby / Available',
+              battery: '100%',
+              capacity: '350 kg'
+            });
+          }
+
+          // If NGO, save to recipients table
           if (normalizedRole === 'NGO') {
             await supabase.from('recipients').upsert({
               id: data.user.id,
@@ -182,6 +213,7 @@ export default function Login({ onLoginSuccess }) {
 
         setSuccessMsg('Account registered successfully! Signing in...');
 
+        // 3. Auto Sign In
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password
@@ -203,6 +235,7 @@ export default function Login({ onLoginSuccess }) {
           });
         }
       } else {
+        // Standard Sign In
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password
@@ -220,7 +253,7 @@ export default function Login({ onLoginSuccess }) {
         onLoginSuccess({
           id: data.user.id,
           email: data.user.email,
-          name: profile?.full_name || userMeta.full_name || 'BhojanSetu Member',
+          name: profile?.full_name || profile?.name || userMeta.full_name || userMeta.name || 'BhojanSetu Member',
           phone: profile?.phone || userMeta.phone || '',
           role: (profile?.role || userMeta.role || 'DONOR').toUpperCase(),
           organization: profile?.organization || userMeta.organization || 'Community Hub',
@@ -255,9 +288,11 @@ export default function Login({ onLoginSuccess }) {
           options: {
             data: {
               full_name: preset.name,
+              name: preset.name,
               role: preset.role,
               organization: preset.organization,
-              photo_url: preset.photo_url
+              photo_url: preset.photo_url,
+              vehicle_number: preset.vehicle_number || ''
             }
           }
         });
@@ -269,18 +304,32 @@ export default function Login({ onLoginSuccess }) {
             id: signUpData.user.id,
             email: preset.email,
             full_name: preset.name,
+            name: preset.name,
             role: preset.role,
             organization: preset.organization,
-            photo_url: preset.photo_url
+            photo_url: preset.photo_url,
+            vehicle_number: preset.vehicle_number || ''
           });
+
+          if (preset.role === 'DRIVER') {
+            await supabase.from('drivers').upsert({
+              id: signUpData.user.id,
+              name: preset.name,
+              email: preset.email,
+              vehicle: preset.vehicle_number || 'Express Unit',
+              photo_url: preset.photo_url,
+              status: 'Standby / Available'
+            });
+          }
 
           onLoginSuccess({
             id: signUpData.user.id,
             email: preset.email,
             name: preset.name,
-            role: preset.role,
+            role: preset.role.toUpperCase(),
             organization: preset.organization,
-            photo_url: preset.photo_url
+            photo_url: preset.photo_url,
+            vehicle_number: preset.vehicle_number || ''
           });
         }
       } else if (data?.user) {
@@ -288,9 +337,10 @@ export default function Login({ onLoginSuccess }) {
           id: data.user.id,
           email: preset.email,
           name: preset.name,
-          role: preset.role,
+          role: preset.role.toUpperCase(),
           organization: preset.organization,
-          photo_url: preset.photo_url
+          photo_url: preset.photo_url,
+          vehicle_number: preset.vehicle_number || ''
         });
       }
     } catch (err) {
@@ -337,7 +387,7 @@ export default function Login({ onLoginSuccess }) {
                 </select>
               </div>
 
-              {/* Photo Upload / Camera Capture */}
+              {/* Compact Photo Upload / Camera Capture */}
               <div className="input-group">
                 <div className="flex items-center justify-between mb-1">
                   <label className="m-0">
@@ -425,7 +475,7 @@ export default function Login({ onLoginSuccess }) {
                 </div>
               </div>
 
-              {/* Role-Specific Field: Vehicle Plate vs Organization */}
+              {/* Role-Specific Field */}
               {isDriver ? (
                 <div className="input-group">
                   <label>Vehicle Plate Number</label>
