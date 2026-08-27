@@ -63,13 +63,23 @@ export function useLiveDonations() {
   };
 
   const updateDonationStatus = async (id, updates) => {
+    const payload = typeof updates === 'string' ? { status: updates } : updates;
+
+    // Optimistic local state update
+    setDonations((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...payload } : item))
+    );
+
     const { data, error } = await supabase
       .from('donations')
-      .update(updates)
+      .update(payload)
       .eq('id', id)
       .select();
 
-    if (error) throw error;
+    if (error) {
+      fetchDonations(); // Rollback if server fails
+      throw error;
+    }
     return data;
   };
 
@@ -92,7 +102,7 @@ export function useLiveLogistics() {
       setLoading(true);
       const [driversRes, routesRes] = await Promise.all([
         supabase.from('drivers').select('*'),
-        supabase.from('routes').select('*')
+        supabase.from('delivery_routes').select('*').order('created_at', { ascending: false })
       ]);
 
       if (driversRes.data) setDrivers(driversRes.data);
@@ -117,7 +127,7 @@ export function useLiveLogistics() {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'routes' },
+        { event: '*', schema: 'public', table: 'delivery_routes' },
         () => fetchLogistics()
       )
       .subscribe();

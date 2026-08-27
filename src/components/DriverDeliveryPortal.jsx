@@ -26,6 +26,7 @@ const PAYOUT_PER_RUN = 150;
 export default function DriverApp({ donations = [], updateDonationStatus, driverUser, onLogout }) {
   const [activeTab, setActiveTab] = useState('GPS_NAV'); // 'GPS_NAV' | 'AVAILABLE' | 'HISTORY'
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [isAccepting, setIsAccepting] = useState(false);
   
   // OTP Verification Modal State
   const [otpModalOpen, setOtpModalOpen] = useState(false);
@@ -33,66 +34,120 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
   const [otpError, setOtpError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // 1. Current Active Mission (Only for this specific driver)
+  // 1. Current Active Mission (Matched to this driver)
   const activeMission = useMemo(() => {
     if (!driverUser) return null;
-    return donations.find(
-      (d) => (d.driver_id === driverUser.id || d.assigned_driver_id === driverUser.id) &&
-             d.status === 'In Transit'
-    );
+    const currentId = String(driverUser.id || '').trim();
+    const currentName = String(driverUser.name || '').trim().toLowerCase();
+
+    return donations.find((d) => {
+      const matchId = String(d.driver_id || d.assigned_driver_id || '').trim() === currentId;
+      const matchName = String(d.driver_name || '').trim().toLowerCase() === currentName;
+      const isInTransit = String(d.status || '').toLowerCase() === 'in transit';
+
+      return (matchId || matchName) && isInTransit;
+    });
   }, [donations, driverUser]);
 
-  // 2. Open Claimable Runs (Unassigned orders ready for pickup)
+  // 2. Open Claimable Runs (Unassigned food ready for rescue)
   const openMissions = useMemo(() => {
-    return donations.filter(
-      (d) => (d.status === 'Claimed - Awaiting Dispatch' || d.status === 'Pending Pickup') &&
-             (!d.driver_id || d.driver_id === '')
-    );
+    return donations.filter((d) => {
+      const status = String(d.status || '').toLowerCase().trim();
+      
+      // Exclude completed or delivered orders
+      if (status === 'completed' || status === 'delivered') return false;
+
+      // Exclude orders already claimed by another courier and actively in transit
+      if (status === 'in transit') return false;
+
+      // Unassigned check
+      const hasNoDriver = !d.driver_id || String(d.driver_id).trim() === '' || d.driver_id === null;
+
+      // Claimable pool statuses
+      const isAvailableStatus = 
+        status === 'pending pickup' || 
+        status === 'claimed - awaiting dispatch' || 
+        status === 'available' || 
+        status === '';
+
+      return isAvailableStatus && hasNoDriver;
+    });
   }, [donations]);
 
-  // 3. Completed Delivery History (Only fulfilled by this driver)
+  // 3. Completed Delivery History (Fulfilled by this driver)
   const completedRuns = useMemo(() => {
     if (!driverUser) return [];
-    return donations.filter(
-      (d) => (d.driver_id === driverUser.id || d.assigned_driver_id === driverUser.id) &&
-             d.status === 'Completed'
-    );
+    const currentId = String(driverUser.id || '').trim();
+    const currentName = String(driverUser.name || '').trim().toLowerCase();
+
+    return donations.filter((d) => {
+      const matchId = String(d.driver_id || d.assigned_driver_id || '').trim() === currentId;
+      const matchName = String(d.driver_name || '').trim().toLowerCase() === currentName;
+      const isCompleted = String(d.status || '').toLowerCase() === 'completed';
+
+      return (matchId || matchName) && isCompleted;
+    });
   }, [donations, driverUser]);
 
   const totalEarnings = useMemo(() => completedRuns.length * PAYOUT_PER_RUN, [completedRuns]);
 
   // Accept Open Mission
   const handleAcceptRun = async (donation) => {
+    if (!donation?.id) return;
+    
     try {
+      setIsAccepting(true);
+
+      let currentDriverId = driverUser?.id;
+      if (!currentDriverId) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        currentDriverId = authUser?.id;
+      }
+
+      if (!currentDriverId) {
+        alert('Driver session not found. Please sign in again.');
+        return;
+      }
+
       const updates = {
         status: 'In Transit',
-        driver_id: driverUser.id,
-        assigned_driver_id: driverUser.id,
-        driver_name: driverUser.name
+        driver_id: currentDriverId,
+        assigned_driver_id: currentDriverId,
+        driver_name: driverUser?.name || 'Courier Agent'
       };
 
-      if (updateDonationStatus) {
+      // 1. Trigger parent hook update (with optimistic UI)
+      if (typeof updateDonationStatus === 'function') {
         await updateDonationStatus(donation.id, updates);
       } else {
-        const { error } = await supabase.from('donations').update(updates).eq('id', donation.id);
-        if (error) throw error;
+        const { error: dbError } = await supabase
+          .from('donations')
+          .update(updates)
+          .eq('id', donation.id);
+
+        if (dbError) throw dbError;
       }
+
+      // 2. Switch to Turn-by-Turn GPS HUD
       setActiveTab('GPS_NAV');
     } catch (err) {
-      alert('Error accepting delivery: ' + err.message);
+      console.error('Accept run error:', err);
+      alert('Error accepting delivery: ' + (err.message || 'Database update failed'));
+    } finally {
+      setIsAccepting(false);
     }
   };
 
-  // Verify OTP and Handover
+  // Verify OTP and Complete Delivery
   const handleVerifyOtpAndComplete = async () => {
     if (!activeMission) return;
     setOtpError('');
 
-    // Check OTP against donation record (or fallback demo OTP)
-    const validOtp = activeMission.delivery_otp || '4821';
+    const expectedOtp = String(activeMission.delivery_otp || '4821').trim();
+    const providedOtp = String(enteredOtp || '').trim();
 
-    if (enteredOtp.trim() !== String(validOtp).trim()) {
-      setOtpError('Invalid OTP! Please ask the recipient center for their 4-digit code.');
+    if (providedOtp !== expectedOtp) {
+      setOtpError('Invalid OTP! Please ask the recipient center for their 4-digit verification code.');
       return;
     }
 
@@ -103,18 +158,29 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
         delivered_at: new Date().toISOString()
       };
 
-      if (updateDonationStatus) {
+      if (typeof updateDonationStatus === 'function') {
         await updateDonationStatus(activeMission.id, updates);
       } else {
-        const { error } = await supabase.from('donations').update(updates).eq('id', activeMission.id);
-        if (error) throw error;
+        const { error: dbError } = await supabase
+          .from('donations')
+          .update(updates)
+          .eq('id', activeMission.id);
+
+        if (dbError) throw dbError;
       }
+
+      // Update route record if present
+      await supabase
+        .from('delivery_routes')
+        .update({ status: 'Completed', progress: 100 })
+        .ilike('cargo', `%${activeMission.item}%`);
 
       setOtpModalOpen(false);
       setEnteredOtp('');
       setActiveTab('HISTORY');
     } catch (err) {
-      setOtpError('Error completing delivery: ' + err.message);
+      console.error('Handover completion error:', err);
+      setOtpError('Error completing delivery: ' + (err.message || 'Database update failed'));
     } finally {
       setIsVerifying(false);
     }
@@ -126,7 +192,19 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
       <header className="driver-header-card">
         <div className="driver-header-meta">
           <div className="driver-avatar-box">
-            <Truck className="w-6 h-6 text-white" />
+            {driverUser?.photo_url ? (
+              <img 
+                src={driverUser.photo_url} 
+                alt={driverUser.name || 'Driver'} 
+                className="driver-avatar-img"
+                onError={(e) => { 
+                  e.target.onerror = null;
+                  e.target.src = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(driverUser?.name || 'driver')}`; 
+                }}
+              />
+            ) : (
+              <Truck className="w-6 h-6 text-white" />
+            )}
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -136,7 +214,7 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
               </span>
             </div>
             <p className="driver-sub-text">
-              Vehicle: <strong>{driverUser?.vehicle_number || 'Express Cargo'}</strong> • Payout Rate: <strong>₹150/drop</strong>
+              Vehicle: <strong>{driverUser?.vehicle_number || 'Express Cargo EV'}</strong> • Payout Rate: <strong>₹150/drop</strong>
             </p>
           </div>
         </div>
@@ -148,9 +226,9 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
         )}
       </header>
 
-      {/* Quick Metrics */}
+      {/* KPI Cards */}
       <div className="driver-kpi-row">
-        <div className="driver-kpi-card highlight">
+        <div className="driver-kpi-card">
           <div>
             <span className="kpi-tag">My Total Earnings</span>
             <h3 className="kpi-num">₹{totalEarnings.toLocaleString('en-IN')}</h3>
@@ -172,13 +250,15 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
           <div>
             <span className="kpi-tag">Current Mission</span>
             <h3 className="kpi-num">{activeMission ? '1 Active' : 'Standby'}</h3>
-            <span className="kpi-sub neutral"><Clock className="w-3 h-3" /> {activeMission ? activeMission.item : 'Waiting for run'}</span>
+            <span className="kpi-sub neutral">
+              <Clock className="w-3 h-3" /> {activeMission ? activeMission.item : 'Waiting for run'}
+            </span>
           </div>
           <div className="kpi-icon-circle amber"><Navigation className="w-6 h-6" /></div>
         </div>
       </div>
 
-      {/* Driver Navigation Tabs */}
+      {/* Navigation Tabs */}
       <nav className="driver-nav-tabs">
         <button 
           className={`driver-tab-btn ${activeTab === 'GPS_NAV' ? 'active' : ''}`}
@@ -205,24 +285,25 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
         <div className="gps-container">
           {activeMission ? (
             <div className="gps-active-board">
-              {/* Turn-by-Turn Instruction Banner */}
+              {/* Turn Instruction Banner */}
               <div className="gps-hud-top">
                 <div className="turn-compass">
                   <Compass className="w-7 h-7 text-emerald-400 animate-spin" style={{ animationDuration: '6s' }} />
                 </div>
                 <div className="turn-details">
-                  <h3>In 400m, Turn Right onto Service Road</h3>
+                  <h3>In 400m, Turn Right onto Sector Service Road</h3>
                   <p>En route to: <strong>{activeMission.location}</strong></p>
                 </div>
                 <button 
                   className={`voice-toggle-btn ${voiceEnabled ? 'active' : ''}`}
                   onClick={() => setVoiceEnabled(!voiceEnabled)}
+                  title="Toggle Voice Guidance"
                 >
                   <Volume2 className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Map Canvas with Route Vectors and Vehicle Marker */}
+              {/* Map Canvas */}
               <div className="gps-map-viewport">
                 <div className="gps-map-grid-bg">
                   <svg className="gps-route-svg" viewBox="0 0 800 500" preserveAspectRatio="none">
@@ -257,14 +338,14 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
                     </div>
                   </div>
 
-                  {/* Voice Control FAB */}
-                  <button className="gps-voice-fab" onClick={() => alert('Listening for destination update...')}>
+                  {/* Voice Control Button */}
+                  <button className="gps-voice-fab" onClick={() => alert('Calculating shortest traffic route...')}>
                     <Mic className="w-6 h-6 text-white" />
                   </button>
                 </div>
               </div>
 
-              {/* Bottom Telemetry HUD */}
+              {/* Telemetry HUD */}
               <div className="gps-hud-bottom">
                 <div className="hud-metric">
                   <span className="hud-lbl">ETA</span>
@@ -276,10 +357,10 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
                 </div>
                 <div className="hud-metric">
                   <span className="hud-lbl">Decay Buffer</span>
-                  <h4 className="hud-val text-amber-400">{activeMission.expiry || 'Safe'}</h4>
+                  <h4 className="hud-val text-amber-400">{activeMission.expiry || 'Safe Window'}</h4>
                 </div>
                 
-                {/* Trigger OTP Handover Modal */}
+                {/* Handover OTP Action */}
                 <button 
                   className="btn-complete-handover"
                   onClick={() => { setOtpError(''); setEnteredOtp(''); setOtpModalOpen(true); }}
@@ -332,8 +413,20 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
                     <p><MapPin className="w-3.5 h-3.5 inline text-slate-400" /> <strong>Pickup:</strong> {item.donor}</p>
                     <p><MapPin className="w-3.5 h-3.5 inline text-emerald-600" /> <strong>Dropoff:</strong> {item.location}</p>
                   </div>
-                  <button className="btn-claim-run" onClick={() => handleAcceptRun(item)}>
-                    <Navigation className="w-4 h-4" /> Accept Run & Open GPS
+                  <button 
+                    className="btn-claim-run" 
+                    onClick={() => handleAcceptRun(item)}
+                    disabled={isAccepting}
+                  >
+                    {isAccepting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Claiming...
+                      </>
+                    ) : (
+                      <>
+                        <Navigation className="w-4 h-4" /> Accept Run & Open GPS
+                      </>
+                    )}
                   </button>
                 </div>
               ))}
@@ -379,7 +472,11 @@ export default function DriverApp({ donations = [], updateDonationStatus, driver
                       <td className="font-semibold">{run.item}</td>
                       <td><span className="qty-tag">{run.quantity}</span></td>
                       <td><MapPin className="w-3.5 h-3.5 inline text-emerald-500" /> {run.location}</td>
-                      <td>{run.delivered_at ? new Date(run.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Verified'}</td>
+                      <td>
+                        {run.delivered_at 
+                          ? new Date(run.delivered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                          : 'Verified'}
+                      </td>
                       <td className="payout-cell">+₹{PAYOUT_PER_RUN}</td>
                     </tr>
                   ))}
