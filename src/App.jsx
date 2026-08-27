@@ -7,14 +7,14 @@ import AdminDashboard from "./components/AdminDashboard";
 import DonorPortal from "./components/DonorPortal";
 import LogisticsDashboard from "./components/LogisticsDashboard";
 import NgoDashboard from "./components/NgoDashboard";
+import DriverDeliveryPortal from "./components/DriverDeliveryPortal";
 import { useLiveDonations } from "./hooks/useBhojanData";
 import { supabase } from "./supabaseClient";
 import "./App.css";
-import DriverDeliveryPortal from "./components/DriverDeliveryPortal";
 
 export default function App() {
   const [theme, setTheme] = useState(
-    () => localStorage.getItem("bhojan_theme") || "light",
+    () => localStorage.getItem("bhojan_theme") || "light"
   );
   const [currentTab, setCurrentTab] = useState("ADMIN");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -22,30 +22,42 @@ export default function App() {
 
   const { donations, loading, updateDonationStatus } = useLiveDonations();
 
-  // Listen to Supabase session state
+  // Helper to determine initial landing tab based on user role
+  const getDefaultTabForRole = (role) => {
+    switch (role?.toUpperCase()) {
+      case "DONOR":
+        return "DONOR";
+      case "NGO":
+        return "NGO";
+      case "DRIVER":
+        return "DRIVER";
+      case "LOGISTICS":
+        return "LOGISTICS";
+      default:
+        return "ADMIN";
+    }
+  };
+
+  // Listen to Supabase session state on mount
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const userRole = (
           session.user.user_metadata?.role || "admin"
         ).toUpperCase();
-        setUser({
+
+        const activeUser = {
           id: session.user.id,
           email: session.user.email,
-          name: session.user.user_metadata?.full_name || "BhojanSetu Member",
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "BhojanSetu Member",
           role: userRole,
           organization:
             session.user.user_metadata?.organization || "Central Ops",
-        });
-        setCurrentTab(
-          userRole === "DONOR"
-            ? "DONOR"
-            : userRole === "NGO"
-              ? "NGO"
-              : userRole === "DRIVER" || userRole === "LOGISTICS"
-                ? "LOGISTICS"
-                : "ADMIN",
-        );
+          vehicle_number: session.user.user_metadata?.vehicle_number || "Express Unit",
+        };
+
+        setUser(activeUser);
+        setCurrentTab(getDefaultTabForRole(userRole));
       }
     });
 
@@ -57,9 +69,10 @@ export default function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => subscription?.unsubscribe();
   }, []);
 
+  // Theme Sync
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("bhojan_theme", theme);
@@ -73,24 +86,18 @@ export default function App() {
     await supabase.auth.signOut();
     setUser(null);
     localStorage.removeItem("sb-token");
+    localStorage.removeItem("bhojansetu_driver_session");
     sessionStorage.clear();
   };
 
   const handleLoginSuccess = (userData) => {
     const normalizedRole = (userData.role || "admin").toUpperCase();
-    setUser({
+    const activeUser = {
       ...userData,
       role: normalizedRole,
-    });
-    setCurrentTab(
-      normalizedRole === "DONOR"
-        ? "DONOR"
-        : normalizedRole === "NGO"
-          ? "NGO"
-          : normalizedRole === "LOGISTICS" || normalizedRole === "DRIVER"
-            ? "LOGISTICS"
-            : "ADMIN",
-    );
+    };
+    setUser(activeUser);
+    setCurrentTab(getDefaultTabForRole(normalizedRole));
   };
 
   // Render Login view when logged out
@@ -98,12 +105,16 @@ export default function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
+  // Count unallocated surplus items for badge
   const pendingRescuesCount = donations.filter(
-    (d) => d.status === "Pending Pickup",
+    (d) => d.status === "Pending Pickup"
   ).length;
+
+  const isDriverRole = user.role === "DRIVER";
 
   return (
     <div className="app-layout">
+      {/* Interactive Role-Adaptive Sidebar */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
@@ -115,7 +126,9 @@ export default function App() {
         onLogout={handleLogout}
       />
 
+      {/* Main Dynamic Viewport */}
       <main className="app-main-content">
+        {/* Admin Dashboard */}
         {currentTab === "ADMIN" && (
           <AdminDashboard
             donations={donations}
@@ -123,18 +136,40 @@ export default function App() {
             updateDonationStatus={updateDonationStatus}
           />
         )}
-        {currentTab === "LOGISTICS" && (
+
+        {/* Driver Portal (Isolated GPS & Deliveries) */}
+        {(currentTab === "DRIVER" || (isDriverRole && currentTab === "LOGISTICS")) && (
           <DriverDeliveryPortal
-            user={user}
+            driverUser={user}
             donations={donations}
+            updateDonationStatus={updateDonationStatus}
+            onLogout={handleLogout}
+          />
+        )}
+
+        {/* Global Logistics Fleet Engine (Admin/Manager view) */}
+        {currentTab === "LOGISTICS" && !isDriverRole && (
+          <LogisticsDashboard donations={donations} />
+        )}
+
+        {/* Donor Surplus Report & History */}
+        {currentTab === "DONOR" && (
+          <DonorPortal 
+            user={user} 
+            donations={donations}
+          />
+        )}
+
+        {/* NGO Beneficiary Hub */}
+        {currentTab === "NGO" && (
+          <NgoDashboard 
+            donations={donations} 
             updateDonationStatus={updateDonationStatus}
           />
         )}
-        {currentTab === "DONOR" && <DonorPortal user={user} />}
-        {currentTab === "LOGISTICS" && <LogisticsDashboard />}
-        {currentTab === "NGO" && <NgoDashboard donations={donations} />}
       </main>
 
+      {/* Settings Modal */}
       {isSettingsOpen && (
         <SettingsModal
           user={user}
@@ -235,9 +270,8 @@ function SettingsModal({ user, theme, onToggleTheme, onClose, onSave }) {
                   >
                     <option value="ADMIN">ADMIN (Central Operations)</option>
                     <option value="DONOR">DONOR (Resource Provider)</option>
-                    <option value="DRIVER">
-                      DRIVER / LOGISTICS (Fleet Courier)
-                    </option>
+                    <option value="DRIVER">DRIVER (Fleet Courier)</option>
+                    <option value="LOGISTICS">LOGISTICS (Fleet Manager)</option>
                     <option value="NGO">NGO (Beneficiary Hub)</option>
                   </select>
                 </div>
@@ -266,9 +300,7 @@ function SettingsModal({ user, theme, onToggleTheme, onClose, onSave }) {
                 <div className="setting-toggle-row">
                   <div>
                     <h4>Real-time Telemetry Push</h4>
-                    <p>
-                      Receive sound and visual alerts for high-priority drops.
-                    </p>
+                    <p>Receive sound and visual alerts for high-priority drops.</p>
                   </div>
                   <input
                     type="checkbox"

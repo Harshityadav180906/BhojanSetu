@@ -1,36 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { Heart, Lock, Mail, AlertCircle, KeyRound, Loader2 } from 'lucide-react';
+import { 
+  Heart, Lock, Mail, AlertCircle, KeyRound, Loader2, 
+  User, Phone, MapPin, Building, Crosshair, Camera, 
+  Upload, CheckCircle, Truck, X
+} from 'lucide-react';
 import './Login.css';
 
 const PRESET_USERS = [
   {
     email: 'admin@bhojansetu.org',
     password: 'Password@123',
-    name: 'Elena Rostova',
-    role: 'admin',
-    organization: 'Central Command'
+    name: 'Dr. Elena Rostova',
+    role: 'ADMIN',
+    organization: 'Central Command HQ',
+    photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'
   },
   {
     email: 'donor@bhojansetu.org',
     password: 'Password@123',
-    name: 'Marco Bellini',
-    role: 'donor',
-    organization: 'Annapurna Kitchen'
-  },
-  {
-    email: 'driver@bhojansetu.org',
-    password: 'Password@123',
-    name: 'Marcus Vance',
-    role: 'logistics',
-    organization: 'Express Fleet'
+    name: 'Annapurna Caterers',
+    role: 'DONOR',
+    organization: 'Annapurna Kitchen',
+    photo_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150'
   },
   {
     email: 'ngo@bhojansetu.org',
     password: 'Password@123',
-    name: 'Sarah Jenkins',
-    role: 'ngo',
-    organization: 'Hope Haven Shelter'
+    name: 'Sister Sarah Jenkins',
+    role: 'NGO',
+    organization: 'Hope Haven Shelter',
+    photo_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150'
   }
 ];
 
@@ -39,13 +39,80 @@ export default function Login({ onLoginSuccess }) {
   const [password, setPassword] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
 
+  // Registration Fields
   const [fullName, setFullName] = useState('');
-  const [role, setRole] = useState('donor');
+  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('DONOR');
   const [organization, setOrganization] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [address, setAddress] = useState('');
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
 
+  // Image Upload / Camera State
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const isDriver = role.toUpperCase() === 'DRIVER';
+
+  // Handle Image File Selection / Camera Capture
+  const handleImageFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image file size must be less than 5MB.');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoUrl(reader.result);
+      setIsUploadingPhoto(false);
+      setError('');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Auto-Detect GPS Location
+  const handleDetectGPS = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsFetchingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setLatitude(lat);
+        setLongitude(lng);
+
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+          );
+          const data = await res.json();
+          setAddress(data?.display_name || `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        } catch {
+          setAddress(`GPS Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`);
+        } finally {
+          setIsFetchingLocation(false);
+        }
+      },
+      () => {
+        setIsFetchingLocation(false);
+        setError('GPS permission denied or unavailable. Enter address manually.');
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -53,55 +120,89 @@ export default function Login({ onLoginSuccess }) {
     setError('');
     setSuccessMsg('');
 
+    // Mandatory Photo Validation for Drivers
+    if (isRegisterMode && isDriver && !photoUrl) {
+      setError('Driver Verification Photo is compulsory. Please take a photo or upload an image.');
+      setLoading(false);
+      return;
+    }
+
+    const defaultPhoto = photoUrl.trim() || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(fullName || 'User')}`;
+    const normalizedRole = role.toUpperCase();
+
     try {
       if (isRegisterMode) {
-        // Sign Up Flow
         const { data, error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
           password: password,
           options: {
             data: {
               full_name: fullName,
-              role: role,
-              organization: organization
+              phone: phone,
+              role: normalizedRole,
+              organization: organization || 'BhojanSetu Network',
+              vehicle_number: isDriver ? vehicleNumber : '',
+              address: address,
+              latitude: latitude ? String(latitude) : '',
+              longitude: longitude ? String(longitude) : '',
+              photo_url: defaultPhoto
             }
           }
         });
 
         if (signUpError) throw signUpError;
 
-        // Ensure row exists in profiles table
         if (data?.user) {
           await supabase.from('profiles').upsert({
             id: data.user.id,
             email: data.user.email,
             full_name: fullName,
-            role: role,
-            organization: organization
+            phone: phone,
+            role: normalizedRole,
+            organization: organization || 'BhojanSetu Network',
+            vehicle_number: isDriver ? vehicleNumber : '',
+            address: address,
+            latitude: latitude,
+            longitude: longitude,
+            photo_url: defaultPhoto
           });
+
+          if (normalizedRole === 'NGO') {
+            await supabase.from('recipients').upsert({
+              id: data.user.id,
+              name: organization || fullName,
+              address: address || 'Community Center Point',
+              phone: phone || '+91 98000 00000',
+              capacity_per_day: 500,
+              storage_type: 'Standard Refrigerators',
+              verified: true
+            });
+          }
         }
 
         setSuccessMsg('Account registered successfully! Signing in...');
-        
-        // Auto-login newly registered user
-        const { data: signInData } = await supabase.auth.signInWithPassword({
+
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password
         });
+
+        if (signInError) throw signInError;
 
         if (signInData?.user) {
           onLoginSuccess({
             id: signInData.user.id,
             email: signInData.user.email,
             name: fullName,
-            role: role.toUpperCase(),
-            organization: organization
+            phone: phone,
+            role: normalizedRole,
+            organization: organization,
+            address: address,
+            photo_url: defaultPhoto,
+            vehicle_number: vehicleNumber
           });
-        } else {
-          setIsRegisterMode(false);
         }
       } else {
-        // Sign In Flow
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password
@@ -109,19 +210,23 @@ export default function Login({ onLoginSuccess }) {
 
         if (signInError) throw signInError;
 
-        // Fetch profile
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
           .maybeSingle();
 
+        const userMeta = data.user.user_metadata || {};
         onLoginSuccess({
           id: data.user.id,
           email: data.user.email,
-          name: profile?.full_name || data.user.user_metadata?.full_name || 'BhojanSetu Member',
-          role: (profile?.role || data.user.user_metadata?.role || 'admin').toUpperCase(),
-          organization: profile?.organization || data.user.user_metadata?.organization || 'Central Ops'
+          name: profile?.full_name || userMeta.full_name || 'BhojanSetu Member',
+          phone: profile?.phone || userMeta.phone || '',
+          role: (profile?.role || userMeta.role || 'DONOR').toUpperCase(),
+          organization: profile?.organization || userMeta.organization || 'Community Hub',
+          address: profile?.address || userMeta.address || '',
+          photo_url: profile?.photo_url || userMeta.photo_url || `https://api.dicebear.com/7.x/initials/svg?seed=${data.user.email}`,
+          vehicle_number: profile?.vehicle_number || userMeta.vehicle_number || ''
         });
       }
     } catch (err) {
@@ -137,60 +242,62 @@ export default function Login({ onLoginSuccess }) {
     setError('');
     setLoading(true);
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: preset.email,
-      password: preset.password
-    });
-
-    if (signInError) {
-      // Auto register if account does not exist
-      const { data: signUpData, error: regError } = await supabase.auth.signUp({
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: preset.email,
-        password: preset.password,
-        options: {
-          data: {
+        password: preset.password
+      });
+
+      if (signInError) {
+        const { data: signUpData, error: regError } = await supabase.auth.signUp({
+          email: preset.email,
+          password: preset.password,
+          options: {
+            data: {
+              full_name: preset.name,
+              role: preset.role,
+              organization: preset.organization,
+              photo_url: preset.photo_url
+            }
+          }
+        });
+
+        if (regError) throw regError;
+
+        if (signUpData?.user) {
+          await supabase.from('profiles').upsert({
+            id: signUpData.user.id,
+            email: preset.email,
             full_name: preset.name,
             role: preset.role,
-            organization: preset.organization
-          }
+            organization: preset.organization,
+            photo_url: preset.photo_url
+          });
+
+          onLoginSuccess({
+            id: signUpData.user.id,
+            email: preset.email,
+            name: preset.name,
+            role: preset.role,
+            organization: preset.organization,
+            photo_url: preset.photo_url
+          });
         }
-      });
-
-      if (!regError && signUpData?.user) {
-        await supabase.from('profiles').upsert({
-          id: signUpData.user.id,
-          email: preset.email,
-          full_name: preset.name,
-          role: preset.role,
-          organization: preset.organization
-        });
-
+      } else if (data?.user) {
         onLoginSuccess({
-          id: signUpData.user.id,
+          id: data.user.id,
           email: preset.email,
           name: preset.name,
-          role: preset.role.toUpperCase(),
-          organization: preset.organization
+          role: preset.role,
+          organization: preset.organization,
+          photo_url: preset.photo_url
         });
-      } else {
-        setError(regError?.message || signInError.message);
       }
-    } else if (data?.user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      onLoginSuccess({
-        id: data.user.id,
-        email: preset.email,
-        name: profile?.full_name || preset.name,
-        role: (profile?.role || preset.role).toUpperCase(),
-        organization: profile?.organization || preset.organization
-      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -201,7 +308,7 @@ export default function Login({ onLoginSuccess }) {
             <Heart className="logo-svg" />
           </div>
           <h1 className="brand-heading">BhojanSetu</h1>
-          <p className="brand-tagline">Surplus Food Redistribution Network</p>
+          <p className="brand-tagline">Surplus Food Redistribution & Tactical Dispatch</p>
         </div>
 
         {error && (
@@ -220,36 +327,156 @@ export default function Login({ onLoginSuccess }) {
         <form onSubmit={handleAuth} className="login-form">
           {isRegisterMode && (
             <>
+              {/* Role Selection */}
               <div className="input-group">
-                <label>Full Name</label>
-                <div className="input-field-wrap">
+                <label>Register Role</label>
+                <select value={role} onChange={(e) => setRole(e.target.value)}>
+                  <option value="DONOR">Donor (Restaurant, Banquet, Catering)</option>
+                  <option value="NGO">NGO (Shelter, Kitchen, Relief Hub)</option>
+                  <option value="DRIVER">Driver (Courier / Delivery Partner)</option>
+                </select>
+              </div>
+
+              {/* Photo Upload / Camera Capture */}
+              <div className="input-group">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="m-0">
+                    Profile Photo {isDriver ? <span className="text-red-500 font-bold">* (Compulsory)</span> : <span className="text-slate-400 font-normal">(Optional)</span>}
+                  </label>
+                  {photoUrl && (
+                    <button 
+                      type="button" 
+                      className="text-xs text-red-500 hover:underline flex items-center gap-0.5 border-0 bg-transparent cursor-pointer"
+                      onClick={() => setPhotoUrl('')}
+                    >
+                      <X className="w-3 h-3" /> Remove
+                    </button>
+                  )}
+                </div>
+
+                <div className="compact-photo-row">
+                  <div className="compact-avatar-thumb">
+                    {photoUrl ? (
+                      <img src={photoUrl} alt="Preview" />
+                    ) : (
+                      <Camera className="w-4 h-4 text-slate-400" />
+                    )}
+                  </div>
+
                   <input
-                    type="text"
-                    placeholder="e.g. Ramesh Kumar"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    capture="user"
+                    onChange={handleImageFileChange}
+                    style={{ display: 'none' }}
                   />
+
+                  <button
+                    type="button"
+                    className={`btn-compact-upload ${photoUrl ? 'uploaded' : ''}`}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {isUploadingPhoto ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : photoUrl ? (
+                      <>
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="compact-badge-text">Photo Attached</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5" />
+                        <span className="compact-badge-text">Take Photo / Upload</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
+              {/* Full Name & Mobile */}
               <div className="form-split-row">
                 <div className="input-group">
-                  <label>Role</label>
-                  <select value={role} onChange={(e) => setRole(e.target.value)}>
-                    <option value="donor">Donor (Restaurant/Catering)</option>
-                    <option value="ngo">NGO (Shelter/Kitchen)</option>
-                    <option value="logistics">Logistics Driver</option>
-                    <option value="admin">System Admin</option>
-                  </select>
+                  <label>Full Name</label>
+                  <div className="input-field-wrap">
+                    <User className="input-svg" />
+                    <input
+                      type="text"
+                      placeholder="e.g. Ramesh Kumar"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                    />
+                  </div>
                 </div>
+
                 <div className="input-group">
-                  <label>Organization</label>
+                  <label>Mobile Number</label>
+                  <div className="input-field-wrap">
+                    <Phone className="input-svg" />
+                    <input
+                      type="tel"
+                      placeholder="+91 98765 43210"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Role-Specific Field: Vehicle Plate vs Organization */}
+              {isDriver ? (
+                <div className="input-group">
+                  <label>Vehicle Plate Number</label>
+                  <div className="input-field-wrap">
+                    <Truck className="input-svg" />
+                    <input
+                      type="text"
+                      placeholder="e.g. DL 03 AX 1234"
+                      value={vehicleNumber}
+                      onChange={(e) => setVehicleNumber(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="input-group">
+                  <label>Organization / Kitchen Name</label>
+                  <div className="input-field-wrap">
+                    <Building className="input-svg" />
+                    <input
+                      type="text"
+                      placeholder="e.g. Grand Feast Caterers"
+                      value={organization}
+                      onChange={(e) => setOrganization(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Location with Auto-GPS Button */}
+              <div className="input-group">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="m-0">Operating Address / Location</label>
+                  <button 
+                    type="button" 
+                    className={`btn-auto-gps ${isFetchingLocation ? 'locating' : ''}`}
+                    onClick={handleDetectGPS}
+                    disabled={isFetchingLocation}
+                  >
+                    <Crosshair className="gps-crosshair-icon" />
+                    <span>{isFetchingLocation ? 'Locating...' : 'Auto-GPS'}</span>
+                  </button>
+                </div>
+                <div className="input-field-wrap">
+                  <MapPin className="input-svg" />
                   <input
                     type="text"
-                    placeholder="e.g. Hope Shelter"
-                    value={organization}
-                    onChange={(e) => setOrganization(e.target.value)}
+                    placeholder="Enter street address or click Auto-GPS"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
                     required
                   />
                 </div>
@@ -257,8 +484,9 @@ export default function Login({ onLoginSuccess }) {
             </>
           )}
 
+          {/* Email & Password */}
           <div className="input-group">
-            <label>Work Email</label>
+            <label>Work Email Address</label>
             <div className="input-field-wrap">
               <Mail className="input-svg" />
               <input
@@ -289,7 +517,7 @@ export default function Login({ onLoginSuccess }) {
             {loading ? (
               <Loader2 className="spinner" />
             ) : isRegisterMode ? (
-              'Create Supabase Account'
+              'Create Account'
             ) : (
               'Sign In to Dashboard'
             )}
@@ -307,15 +535,15 @@ export default function Login({ onLoginSuccess }) {
             }}
           >
             {isRegisterMode
-              ? 'Already have an account? Sign In'
-              : "Don't have an account? Register new user in Supabase"}
+              ? 'Already registered? Sign In'
+              : "Don't have an account? Register new user"}
           </button>
         </div>
 
         {!isRegisterMode && (
           <div className="quick-access-box">
             <div className="quick-title">
-              <KeyRound className="quick-key-icon" /> Seed & Login Supabase Demo Roles:
+              <KeyRound className="quick-key-icon" /> Quick Demo Role Logins:
             </div>
             <div className="quick-grid">
               {PRESET_USERS.map((u) => (
